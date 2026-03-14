@@ -1,0 +1,415 @@
+{
+  "idempotency_key": "menu-import-v1",
+  "batches": [
+    {
+      "objects": [
+
+        { "id": "#cat-starters",   "type": "CATEGORY", "category_data": { "name": "Starters"   } },
+        { "id": "#cat-burgers",    "type": "CATEGORY", "category_data": { "name": "Burgers"    } },
+        { "id": "#cat-sandwiches", "type": "CATEGORY", "category_data": { "name": "Sandwiches" } },
+        { "id": "#cat-mains",      "type": "CATEGORY", "category_data": { "name": "Mains"      } },
+        { "id": "#cat-desserts",   "type": "CATEGORY", "category_data": { "name": "Desserts"   } },
+        { "id": "#cat-drinks",     "type": "CATEGORY", "category_data": { "name": "Drinks"     } },
+
+        {
+          "id": "#item-S01", "type": "ITEM",
+          "item_data": {
+            "name": "Buffalo Wings",
+            "description": "Crispy chicken wings tossed in classic buffalo sauce, served with ranch.",
+            "category_id": "#cat-starters",
+            "label_color": "593C00",
+            "variations": [
+              {
+                "id": "#var-S01", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-S01", "name": "Regular",
+                  "price_money": { "amount": 1400, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-S02", "type": "ITEM",
+          "item_data": {
+            "name": "Mozzarella Sticks",
+            "description": "Breaded mozzarella sticks fried golden, served with marinara.",
+            "category_id": "#cat-starters",
+            "variations": [
+              {
+                "id": "#var-S02", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-S02", "name": "Regular",
+                  "price_money": { "amount": 1100, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-S03", "type": "ITEM",
+          "item_data": {
+            "name": "Loaded Nachos",
+            "description": "Tortilla chips topped with melted cheese, jalapeños, sour cream, and salsa.",
+            "category_id": "#cat-starters",
+            "variations": [
+              {
+                "id": "#var-S03", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-S03", "name": "Regular",
+                  "price_money": { "amount": 1300, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+
+        {
+          "id": "#item-B01", "type": "ITEM",
+          "item_data": {
+            "name": "Classic Cheeseburger",
+            "description": "Beef patty, cheddar cheese, lettuce, tomato, pickles, brioche bun.",
+            "category_id": "#cat-burgers",
+            "variations": [
+              {
+                "id": "#var-B01", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-B01", "name": "Regular",
+                  "price_money": { "amount": 1500, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-B02", "type": "ITEM",
+          "item_data": {
+            "name": "BBQ Bacon Burger",
+            "description": "Beef patty, crispy bacon, cheddar, onion rings, BBQ sauce.",
+            "category_id": "#cat-burgers",
+            "variations": [
+              {
+                "id": "#var-B02", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-B02", "name": "Regular",
+                  "price_money": { "amount": 1700, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-B03", "type": "ITEM",
+          "item_data": {
+            "name": "Veggie Burger",
+            "description": "Plant-based patty, lettuce, tomato, avocado, vegan aioli.",
+            "category_id": "#cat-burgers",
+            "variations": [
+              {
+                "id": "#var-B03", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-B03", "name": "Regular",
+                  "price_money": { "amount": 1400, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-B04", "type": "ITEM",
+          "item_data": {
+            "name": "Mushroom Swiss Burger",
+            "description": "Beef patty topped with sautéed mushrooms and Swiss cheese.",
+            "category_id": "#cat-burgers",
+            "variations": [
+              {
+                "id": "#var-B04", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-B04", "name": "Regular",
+                  "price_money": { "amount": 1600, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+
+        {
+          "id": "#item-SW01", "type": "ITEM",
+          "item_data": {
+            "name": "Grilled Chicken Sandwich",
+            "description": "Grilled chicken breast, lettuce, tomato, honey mustard.",
+            "category_id": "#cat-sandwiches",
+            "variations": [
+              {
+                "id": "#var-SW01", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-SW01", "name": "Regular",
+                  "price_money": { "amount": 1400, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-SW02", "type": "ITEM",
+          "item_data": {
+            "name": "Philly Cheesesteak",
+            "description": "Shaved beef, grilled onions, peppers, melted provolone.",
+            "category_id": "#cat-sandwiches",
+            "variations": [
+              {
+                "id": "#var-SW02", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-SW02", "name": "Regular",
+                  "price_money": { "amount": 1600, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-SW03", "type": "ITEM",
+          "item_data": {
+            "name": "Pulled Pork Sandwich",
+            "description": "Slow-smoked pulled pork, coleslaw, BBQ sauce on brioche bun.",
+            "category_id": "#cat-sandwiches",
+            "variations": [
+              {
+                "id": "#var-SW03", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-SW03", "name": "Regular",
+                  "price_money": { "amount": 1500, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+
+        {
+          "id": "#item-M01", "type": "ITEM",
+          "item_data": {
+            "name": "BBQ Ribs",
+            "description": "Slow-cooked pork ribs glazed with house BBQ sauce.",
+            "category_id": "#cat-mains",
+            "variations": [
+              {
+                "id": "#var-M01", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-M01", "name": "Regular",
+                  "price_money": { "amount": 2800, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-M02", "type": "ITEM",
+          "item_data": {
+            "name": "Fried Chicken Plate",
+            "description": "Southern-style fried chicken served with mashed potatoes and gravy.",
+            "category_id": "#cat-mains",
+            "variations": [
+              {
+                "id": "#var-M02", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-M02", "name": "Regular",
+                  "price_money": { "amount": 2000, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-M03", "type": "ITEM",
+          "item_data": {
+            "name": "New York Strip Steak",
+            "description": "Grilled 12 oz NY strip served with garlic butter and fries.",
+            "category_id": "#cat-mains",
+            "variations": [
+              {
+                "id": "#var-M03", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-M03", "name": "Regular",
+                  "price_money": { "amount": 3400, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-M04", "type": "ITEM",
+          "item_data": {
+            "name": "Mac & Cheese",
+            "description": "Creamy baked macaroni with cheddar cheese sauce.",
+            "category_id": "#cat-mains",
+            "variations": [
+              {
+                "id": "#var-M04", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-M04", "name": "Regular",
+                  "price_money": { "amount": 1600, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+
+        {
+          "id": "#item-D01", "type": "ITEM",
+          "item_data": {
+            "name": "New York Cheesecake",
+            "description": "Classic cheesecake with strawberry sauce.",
+            "category_id": "#cat-desserts",
+            "variations": [
+              {
+                "id": "#var-D01", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-D01", "name": "Regular",
+                  "price_money": { "amount": 1000, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-D02", "type": "ITEM",
+          "item_data": {
+            "name": "Chocolate Brownie Sundae",
+            "description": "Warm chocolate brownie topped with vanilla ice cream.",
+            "category_id": "#cat-desserts",
+            "variations": [
+              {
+                "id": "#var-D02", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-D02", "name": "Regular",
+                  "price_money": { "amount": 1100, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-D03", "type": "ITEM",
+          "item_data": {
+            "name": "Apple Pie",
+            "description": "Classic American apple pie served warm.",
+            "category_id": "#cat-desserts",
+            "variations": [
+              {
+                "id": "#var-D03", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-D03", "name": "Regular",
+                  "price_money": { "amount": 900, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+
+        {
+          "id": "#item-DR01", "type": "ITEM",
+          "item_data": {
+            "name": "Coca-Cola",
+            "category_id": "#cat-drinks",
+            "variations": [
+              {
+                "id": "#var-DR01", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-DR01", "name": "Regular",
+                  "price_money": { "amount": 300, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-DR02", "type": "ITEM",
+          "item_data": {
+            "name": "Iced Tea",
+            "category_id": "#cat-drinks",
+            "variations": [
+              {
+                "id": "#var-DR02", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-DR02", "name": "Regular",
+                  "price_money": { "amount": 300, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-DR03", "type": "ITEM",
+          "item_data": {
+            "name": "Lemonade",
+            "category_id": "#cat-drinks",
+            "variations": [
+              {
+                "id": "#var-DR03", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-DR03", "name": "Regular",
+                  "price_money": { "amount": 400, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-DR04", "type": "ITEM",
+          "item_data": {
+            "name": "Craft Beer (Pint)",
+            "category_id": "#cat-drinks",
+            "variations": [
+              {
+                "id": "#var-DR04", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-DR04", "name": "Regular",
+                  "price_money": { "amount": 700, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "#item-DR05", "type": "ITEM",
+          "item_data": {
+            "name": "Espresso",
+            "category_id": "#cat-drinks",
+            "variations": [
+              {
+                "id": "#var-DR05", "type": "ITEM_VARIATION",
+                "item_variation_data": {
+                  "item_id": "#item-DR05", "name": "Regular",
+                  "price_money": { "amount": 400, "currency": "USD" },
+                  "pricing_type": "FIXED_PRICING"
+                }
+              }
+            ]
+          }
+        }
+
+      ]
+    }
+  ]
+}

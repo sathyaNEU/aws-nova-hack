@@ -1,0 +1,6 @@
+strands-agents
+slack-bolt
+squareup
+squareup_legacy
+python-dotenv
+psycopg2-binary

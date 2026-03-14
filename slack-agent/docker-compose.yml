@@ -1,0 +1,9 @@
+version: "3.9"
+
+services:
+  slack-agent:
+    build: .
+    container_name: slack-ai-agent
+    env_file:
+      - .env
+    restart: unless-stopped

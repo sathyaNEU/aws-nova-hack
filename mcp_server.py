@@ -4,7 +4,7 @@ from mcp.server.fastmcp import FastMCP
 from tools import business_info, policies, menu, reservations, orders, escalation
 from data.master_data import load as load_master_data
 
-load_dotenv()
+# load_dotenv()
 
 # Load DB-backed data here — this is the process where the tools actually run
 load_master_data()

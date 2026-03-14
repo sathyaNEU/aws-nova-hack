@@ -5,7 +5,6 @@ import os
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-
 class MCPClient:
     def __init__(self, server_script: str = "mcp_server.py"):
         self._server_script = server_script
@@ -21,6 +20,7 @@ class MCPClient:
         params = StdioServerParameters(
             command="python",
             args=[self._server_script],
+            env=dict(os.environ),
         )
 
         stdio_transport = await self._exit_stack.enter_async_context(

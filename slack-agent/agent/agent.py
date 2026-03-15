@@ -1,3 +1,4 @@
+#agent/agent.py
 """
 Strands Agent — store operations assistant.
 
@@ -9,7 +10,7 @@ Tools:
 from datetime import datetime, timedelta
 from strands import Agent
 from strands.models import BedrockModel
-
+import re
 from agent.tools.business_hours import update_business_hours, get_business_hours
 from agent.tools.square_inventory import mark_item_sold_out, mark_item_back_in_stock
 from agent.tools.policy import list_policies, get_policy, update_policy
@@ -81,6 +82,9 @@ print("[agent] BedrockModel ready")
 # One agent instance per Slack user so conversation history is isolated
 _agents: dict[str, Agent] = {}
 
+def _strip_thinking(text: str) -> str:
+    """Remove <thinking>...</thinking> blocks that Nova Pro emits."""
+    return re.sub(r"<thinking>.*?</thinking>\s*", "", text, flags=re.DOTALL).strip()
 
 def _sanitize_messages(agent: Agent) -> None:
     """
@@ -119,19 +123,17 @@ def _get_agent(user_id: str) -> Agent:
 
 print("[agent] Agent factory ready")
 
-
 def handle_message(user_id: str, user_message: str) -> str:
     print(f"[agent] user={user_id} message={user_message!r}")
     try:
         response = _get_agent(user_id)(user_message)
-        result = str(response)
+        result = _strip_thinking(str(response))
     except Exception as e:
-        # If history is still corrupt after sanitization, reset and retry once
         if "conversation must start with a user message" in str(e).lower():
             print(f"[agent] History corrupt for user={user_id}, resetting and retrying")
             del _agents[user_id]
             response = _get_agent(user_id)(user_message)
-            result = str(response)
+            result = _strip_thinking(str(response))
         else:
             raise
     print(f"[agent] user={user_id} response={result!r}")

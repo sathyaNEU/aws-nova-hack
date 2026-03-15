@@ -1,4 +1,3 @@
-#app.py
 import asyncio
 import base64
 import json
@@ -56,6 +55,11 @@ async def slack_actions(request: Request):
     return {"ok": True}
 
 
+@app.get("/")
+async def health_check():
+    return {"status": "ok"}
+
+
 # ── TwiML endpoint ────────────────────────────────────────────────────────────
 
 @app.post("/incoming-call")
@@ -83,6 +87,23 @@ async def media_stream(ws: WebSocket):
 
     await nova.start_session()
 
+    # ── Background task: watches for barge-in and sends Twilio 'clear' ────────
+    async def _watch_barge_in():
+        while nova.is_active:
+            await nova.barge_in_event.wait()   # blocks until barge-in fires
+            nova.barge_in_event.clear()
+            if stream_sid:
+                try:
+                    await ws.send_text(json.dumps({
+                        "event": "clear",
+                        "streamSid": stream_sid,
+                    }))
+                    print("[ws] Sent Twilio 'clear' to flush playback buffer")
+                except Exception as e:
+                    print(f"[ws] clear send error: {e}")
+
+    barge_in_watcher = asyncio.create_task(_watch_barge_in())
+
     try:
         async for raw in ws.iter_text():
             msg = json.loads(raw)
@@ -90,8 +111,9 @@ async def media_stream(ws: WebSocket):
 
             if event == "start":
                 stream_sid = msg["start"]["streamSid"]
+                call_sid   = msg["start"]["callSid"]
                 print(f"[ws] Stream started: {stream_sid}")
-                await nova.start_audio_input()
+                await nova.start_audio_input(call_sid=call_sid)
 
                 send_task.cancel()
                 send_task = asyncio.create_task(
@@ -114,6 +136,7 @@ async def media_stream(ws: WebSocket):
     finally:
         nova.is_active = False
         send_task.cancel()
+        barge_in_watcher.cancel()
         await nova.end_session()
         print("[ws] Session cleaned up")
 
@@ -125,11 +148,9 @@ async def _relay_nova_to_twilio(ws: WebSocket, nova: NovaSonic, stream_sid: str)
     try:
         while nova.is_active:
             item = await nova.audio_queue.get()
-
-            # Unpack generation-tagged chunk
             gen_id, pcm_24k = item
 
-            # Discard audio from a previous (interrupted) generation
+            # Drop stale chunks from before the barge-in
             if gen_id != nova._generation_id:
                 continue
 

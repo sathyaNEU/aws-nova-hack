@@ -5,6 +5,7 @@ import httpx
 from zoneinfo import ZoneInfo
 from utils.pos.base import POSProvider
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 LOCAL_TZ = ZoneInfo("America/New_York")
@@ -43,6 +44,10 @@ class SquarePOS(POSProvider):
             "Content-Type":   "application/json",
             "Square-Version": SQUARE_VERSION,
         }
+
+    def _generate_order_code(self) -> str:
+        """Generate a 6-character uppercase order code from UUID."""
+        return uuid.uuid4().hex[:6].upper()
 
     # ── Catalog ───────────────────────────────────────────────────────────────
 
@@ -171,6 +176,38 @@ class SquarePOS(POSProvider):
             "pickup_details": pickup_detail,
         }
 
+    def complete_payment(self, *, pos_order_id: str, amount_cents: int) -> dict:
+        """
+        Sandbox only: attach a payment to an order using the test card nonce
+        so the order appears as OPEN/paid in the Square POS dashboard.
+        """
+        try:
+            resp = httpx.post(
+                f"{self._base_url}/v2/payments",
+                headers=self._headers,
+                json={
+                    "idempotency_key": str(uuid.uuid4()),
+                    "source_id":       "cnon:card-nonce-ok",
+                    "amount_money":    {"amount": amount_cents, "currency": "USD"},
+                    "order_id":        pos_order_id,
+                    "location_id":     self.location_id,
+                },
+                timeout=15.0,
+            )
+            data = resp.json()
+        except httpx.RequestError as exc:
+            return {"success": False, "error": f"HTTP request failed: {exc}"}
+
+        if resp.status_code not in (200, 201) or "errors" in data:
+            errors = data.get("errors", [{"detail": resp.text}])
+            return {"success": False, "error": "; ".join(e.get("detail", "") for e in errors)}
+
+        return {
+            "success":    True,
+            "payment_id": data["payment"]["id"],
+            "status":     data["payment"].get("status"),
+        }
+
     def create_order(
         self,
         *,
@@ -182,11 +219,12 @@ class SquarePOS(POSProvider):
         special_instructions: str | None,
         idempotency_key: str,
     ) -> dict:
+        order_code = self._generate_order_code()
         payload = {
             "idempotency_key": idempotency_key,
             "order": {
                 "location_id":  self.location_id,
-                "reference_id": idempotency_key,
+                "reference_id": order_code,
                 "line_items":   self._build_line_items(line_items),
                 "fulfillments": [
                     self._build_fulfillment(
@@ -223,10 +261,23 @@ class SquarePOS(POSProvider):
                 "raw":     data,
             }
 
-        sq_order = data["order"]
+        sq_order     = data["order"]
+        pos_order_id = sq_order["id"]
+
+        # ── Sandbox: auto-complete payment so order is visible in POS ─────────
+        if os.getenv("SQUARE_ENV", "sandbox").lower() == "sandbox":
+            total_cents = sq_order.get("total_money", {}).get("amount", 0)
+            pay_result  = self.complete_payment(
+                pos_order_id=pos_order_id,
+                amount_cents=total_cents,
+            )
+            if not pay_result["success"]:
+                logger.warning("[square] Payment completion failed: %s", pay_result["error"])
+
         return {
             "success":      True,
-            "pos_order_id": sq_order["id"],
+            "pos_order_id": pos_order_id,
+            "order_code":   order_code,
             "status":       sq_order.get("state", "OPEN"),
             "raw":          data,
         }

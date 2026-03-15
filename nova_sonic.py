@@ -1,4 +1,3 @@
-#nova_sonic.py
 import asyncio
 import base64
 import json
@@ -28,9 +27,13 @@ _TODAY_STR = f"{_TODAY.isoformat()}, {_TODAY.strftime('%A')}"
 _TOMORROW_STR = f"{_TOMORROW.isoformat()}, {_TOMORROW.strftime('%A')}"
 
 SYSTEM_PROMPT = f"""
-You are the voice receptionist for Bella Tavola, an Italian restaurant in Brooklyn, NY.
+You are the voice receptionist for Nova Dine, an Italian restaurant in Brooklyn, NY.
 You sound like a real, warm human host — use natural filler sounds like "hmm", "sure", "of course",
 "let me check that for you" — but stay concise. Never ramble.
+
+When the conversation starts, you MUST greet the caller with exactly this message:
+"Thank you for calling Nova Dine! How can I help you today?"
+Do not paraphrase or change this greeting. Say it word for word every time.
 
 Today's date is {_TODAY_STR}.
 Tomorrow's date is {_TOMORROW_STR}.
@@ -55,7 +58,8 @@ STRICT RULES — follow these without exception:
    to you — could I get your name and phone number?" Then call escalate_to_manager immediately.
 
 3. If the caller is frustrated, upset, or asks for a human, say:
-   "Of course, let me get someone to call you right back." Then call escalate_to_manager.
+   "Of course, connecting you now." Then call transfer_call with the active CallSid.
+   Do NOT call escalate_to_manager in this case.
 
 4. RESPONSE LENGTH — this is a phone call, not a menu reading. Hard limits:
    - Maximum 2 sentences per response in normal conversation.
@@ -107,17 +111,13 @@ class NovaSonic:
         self._ready_for_audio = asyncio.Event()
 
         # ── Barge-in state ────────────────────────────────────────────────────
-        # True while Nova is generating audio for the current assistant turn.
         self._nova_speaking = False
-
-        # Increments each barge-in so the relay can discard stale chunks.
         self._generation_id = 0
-
-        # True after a barge-in fires, until the next assistant turn starts.
         self._barge_in_fired = False
-
-        # Lock to prevent concurrent barge-in handling.
         self._barge_in_lock = asyncio.Lock()
+
+        # ── NEW: event that main.py watches to send Twilio 'clear' ───────────
+        self.barge_in_event = asyncio.Event()
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -151,20 +151,18 @@ class NovaSonic:
     # ── Barge-in handler ──────────────────────────────────────────────────────
 
     async def _handle_barge_in(self, reason: str):
-        """
-        Called when we detect the user is speaking while Nova is still outputting.
-        Bumps the generation ID so the relay discards all stale queued audio,
-        then cycles the audio channel so Nova starts fresh.
-        """
         async with self._barge_in_lock:
             if self._barge_in_fired:
-                return  # already handled for this turn
+                return
 
             self._barge_in_fired = True
             self._nova_speaking = False
             self._generation_id += 1
             cleared = self._clear_audio_queue_nowait()
             print(f"[nova] Barge-in ({reason}) — gen={self._generation_id}, cleared {cleared} chunks")
+
+            # Signal main.py to send Twilio 'clear' and flush Twilio's playback buffer
+            self.barge_in_event.set()
 
             try:
                 await self._close_audio_channel()
@@ -302,10 +300,10 @@ class NovaSonic:
             }
         })
 
-        # Open persistent audio channel
+        # Open persistent audio channel BEFORE greeting so Nova can listen after
         await self._open_audio_channel()
 
-        # Trigger greeting
+        # ── Trigger greeting ──────────────────────────────────────────────────
         greeting_name = str(uuid.uuid4())
         await self._send({
             "event": {
@@ -313,7 +311,7 @@ class NovaSonic:
                     "promptName": self.prompt_name,
                     "contentName": greeting_name,
                     "type": "TEXT",
-                    "interactive": False,
+                    "interactive": True,
                     "role": "USER",
                     "textInputConfiguration": {"mediaType": "text/plain"},
                 }
@@ -324,7 +322,7 @@ class NovaSonic:
                 "textInput": {
                     "promptName": self.prompt_name,
                     "contentName": greeting_name,
-                    "content": "Hello",
+                    "content": "[conversation started]",
                 }
             }
         })
@@ -340,9 +338,44 @@ class NovaSonic:
         print("[nova] Session setup complete — starting response processor")
         self.response_task = asyncio.create_task(self._process_responses())
 
-    async def start_audio_input(self):
+    async def start_audio_input(self, call_sid: str = ""):
+        self._call_sid = call_sid
         print("[nova] Twilio audio stream connected — ready to receive caller audio")
         self._ready_for_audio.set()
+
+        # Inject the CallSid as a late USER message so Nova can pass it to transfer_call
+        if call_sid:
+            name = str(uuid.uuid4())
+            await self._send({
+                "event": {
+                    "contentStart": {
+                        "promptName": self.prompt_name,
+                        "contentName": name,
+                        "type": "TEXT",
+                        "interactive": False,
+                        "role": "USER",
+                        "textInputConfiguration": {"mediaType": "text/plain"},
+                    }
+                }
+            })
+            await self._send({
+                "event": {
+                    "textInput": {
+                        "promptName": self.prompt_name,
+                        "contentName": name,
+                        "content": f"[system] The active Twilio CallSid is: {call_sid}",
+                    }
+                }
+            })
+            await self._send({
+                "event": {
+                    "contentEnd": {
+                        "promptName": self.prompt_name,
+                        "contentName": name,
+                    }
+                }
+            })
+            print(f"[nova] Injected CallSid: {call_sid}")
 
     async def send_audio_chunk(self, pcm_bytes: bytes):
         if not self.is_active:
@@ -356,8 +389,6 @@ class NovaSonic:
             self._audio_buffer = bytearray()
             self._audio_buffer_ms = 0
 
-            # Always forward audio — Nova needs the caller's voice to process
-            # the new question even mid-barge-in.
             if self._ready_for_audio.is_set():
                 await self._send_audio_bytes(chunk)
 
@@ -421,6 +452,7 @@ class NovaSonic:
 
     async def _process_responses(self):
         current_content_type = None
+        current_stage = ""
 
         try:
             while self.is_active:
@@ -434,32 +466,42 @@ class NovaSonic:
                 data = json.loads(result.value.bytes_.decode("utf-8"))
                 event = data.get("event", {})
 
-                # ── Debug: log all event keys so we can spot new signal names ──
                 if event:
                     keys = list(event.keys())
-                    if keys not in (["audioOutput"], ["textOutput"]):  # suppress noisy ones
+                    if keys not in (["audioOutput"], ["textOutput"]):
                         print(f"[nova rx] event keys: {keys}")
+
+                # ── top-level interrupted signal ──────────────────────────────
+                if "interrupted" in event:
+                    await self._handle_barge_in("interrupted-toplevel")
+                    continue
 
                 if "contentStart" in event:
                     cs = event["contentStart"]
                     self._role = cs.get("role")
                     current_content_type = cs.get("type")
 
-                    stage = json.loads(cs.get("additionalModelFields") or "{}").get("generationStage", "")
-                    print(f"[nova rx] contentStart role={self._role} type={current_content_type} stage={stage}")
+                    add_fields = cs.get("additionalModelFields")
+                    current_stage = (
+                        json.loads(add_fields).get("generationStage", "")
+                        if add_fields else ""
+                    )
+                    print(f"[nova rx] contentStart role={self._role} type={current_content_type} stage={current_stage}")
 
-                    # ── Barge-in signal: Nova explicitly says so ───────────────
-                    if "interrupted" in event:
-                        await self._handle_barge_in("interrupted-event")
+                    # ── KEY FIX: FINAL TEXT after audio = Nova's "I finished
+                    #    speaking" marker. This is NOT a barge-in signal — it
+                    #    means Nova completed naturally. Reset state. ──────────
+                    if self._role == "ASSISTANT" and current_content_type == "TEXT" and current_stage == "FINAL":
+                        self._nova_speaking = False
+                        self._barge_in_fired = False
+                        print("[nova] Turn complete — barge-in re-armed")
+                        # consume the empty contentEnd that follows and move on
+                        continue
 
-                    # ── Barge-in signal: user starts speaking mid-response ─────
-                    # Nova sends a USER contentStart while _nova_speaking is True.
-                    # This is the most reliable signal we have when the
-                    # "interrupted" key isn't emitted.
-                    elif self._role == "USER" and self._nova_speaking:
-                        await self._handle_barge_in("user-contentStart-while-speaking")
+                    # ── USER contentStart while Nova is speaking = real barge-in
+                    if self._role == "USER" and self._nova_speaking:
+                        await self._handle_barge_in("user-started-speaking")
 
-                    # ── Re-arm barge-in when a new ASSISTANT turn starts ───────
                     elif self._role == "ASSISTANT":
                         self._barge_in_fired = False
 
@@ -487,16 +529,7 @@ class NovaSonic:
                     else:
                         self._in_tool_use = False
                         if current_content_type == "TEXT":
-                            add_fields = cs.get("additionalModelFields")
-                            self._display_assistant_text = (
-                                json.loads(add_fields).get("generationStage") == "SPECULATIVE"
-                                if add_fields else False
-                            )
-
-                elif "interrupted" in event:
-                    # Handle interruption signal at the top level too, in case
-                    # it arrives outside of a contentStart wrapper.
-                    await self._handle_barge_in("interrupted-event-toplevel")
+                            self._display_assistant_text = (current_stage == "SPECULATIVE")
 
                 elif "toolUse" in event:
                     tu = event["toolUse"]
@@ -527,47 +560,39 @@ class NovaSonic:
                         await self._send_tool_result(tool_use_id, result_str)
 
                     elif self._role == "ASSISTANT" and current_content_type == "AUDIO":
-                        # One audio chunk ended — don't treat this as the full
-                        # turn ending. Nova sends many small AUDIO chunks per turn.
-                        # Only clear _nova_speaking when we see the FINAL TEXT
-                        # stage (handled below), not on every audio contentEnd.
-                        print("[nova] AUDIO chunk ended")
-
+                        print("[nova] AUDIO block ended")
                         if not self._ready_for_audio.is_set():
-                            print("[nova] Greeting complete — signalling audio gate")
+                            print("[nova] Greeting audio done — opening caller audio gate")
                             self._ready_for_audio.set()
+                        # Nova finished speaking naturally — mark as done
+                        self._nova_speaking = False
 
                     current_content_type = None
+                    current_stage = ""
 
                 elif "textOutput" in event:
                     text = event["textOutput"]["content"]
+
+                    # ── Nova Sonic inline interrupted signal ──────────────────
+                    if '{ "interrupted" : true }' in text:
+                        await self._handle_barge_in("interrupted-text-signal")
+                        continue
+
                     if self._role == "ASSISTANT" and self._display_assistant_text:
                         print(f"[Assistant] {text}")
                     elif self._role == "USER":
                         print(f"[User]      {text}")
 
-                    # ── Detect end of full assistant turn via FINAL TEXT ───────
-                    # Nova emits stage=FINAL on a TEXT contentStart to signal the
-                    # complete response is done. Use this to mark speaking as over
-                    # and re-arm barge-in cleanly.
-                    if self._role == "ASSISTANT" and not self._display_assistant_text:
-                        # FINAL stage TEXT — assistant turn truly complete
-                        self._nova_speaking = False
-                        self._barge_in_fired = False
-                        print("[nova] Assistant full turn complete — barge-in re-armed")
-
                 elif "audioOutput" in event:
-                    # Skip stale audio from an interrupted generation.
                     if self._barge_in_fired:
                         continue
 
                     audio_bytes = base64.b64decode(event["audioOutput"]["content"])
 
-                    # Mark Nova as actively speaking on first audio chunk of turn.
                     if not self._nova_speaking:
                         self._nova_speaking = True
+                        print("[nova] Nova started speaking")
 
-                    # Tag with generation ID so relay can discard stale chunks.
                     await self.audio_queue.put((self._generation_id, audio_bytes))
 
         except asyncio.CancelledError:

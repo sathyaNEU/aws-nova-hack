@@ -2,7 +2,7 @@
 # Hard-coded restaurant data. Later: query DB by restaurant_id.
 
 RESTAURANT_INFO = {
-    "name": "Bella Tavola",
+    "name": "Nova Dine",
     "address": "142 Oak Street, Brooklyn, NY 11201",
     "phone": "+1 (718) 555-0192",
     "timezone": "America/New_York",

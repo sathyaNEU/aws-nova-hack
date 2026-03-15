@@ -16,7 +16,6 @@ class MCPClient:
     async def start(self):
         from contextlib import AsyncExitStack
         self._exit_stack = AsyncExitStack()
-
         params = StdioServerParameters(
             command="python",
             args=[self._server_script],

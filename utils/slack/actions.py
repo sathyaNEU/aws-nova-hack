@@ -84,17 +84,22 @@ def handle_issue_refund(value: dict, channel: str, ts: str, manager: str):
     order_number = value["order_number"]
     contact_name = value["contact_name"]
     phone        = value["phone"]
+    amount_usd   = float(value["amount_usd"])   # <-- needs to come in the button value
+
     try:
-        result = SquarePOS().refund_order(pos_order_id=order_number)
+        result = SquarePOS().refund_order(pos_order_id=order_number, amount_usd=amount_usd)
     except Exception as exc:
         update_message(channel, ts, f"❌ Refund failed for order {order_number}: {exc}")
         return
+
     if result.get("success"):
-        update_message(channel, ts, f"✅ Refund issued for order *{order_number}* ({contact_name}, {phone}) by {manager}.")
+        update_message(channel, ts,
+            f"✅ Refund of *${amount_usd:.2f}* issued for order *{order_number}* "
+            f"({contact_name}, {phone}) by {manager}. Status: {result['status']}"
+        )
     else:
         update_message(channel, ts, f"❌ Refund failed for order *{order_number}*: {result.get('error')}")
-
-
+        
 def handle_mark_completed(value: dict, channel: str, ts: str, manager: str):
     msg = (
         f"✔ *Escalation marked as completed* by *{manager}*\n\n"

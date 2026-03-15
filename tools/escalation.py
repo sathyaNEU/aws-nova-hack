@@ -27,7 +27,6 @@ def _refund_blocks(
     phone: str,
     order_number: str,
     reason: str,
-    pos_provider: str,
 ) -> list:
     """Slack Block Kit message for refund escalations."""
     return [
@@ -40,38 +39,12 @@ def _refund_blocks(
             "fields": [
                 {"type": "mrkdwn", "text": f"*Customer:*\n{contact_name}"},
                 {"type": "mrkdwn", "text": f"*Phone:*\n{phone}"},
-                {"type": "mrkdwn", "text": f"*Order #:*\n{order_number}"},
-                {"type": "mrkdwn", "text": f"*POS:*\n{pos_provider}"},
+                {"type": "mrkdwn", "text": f"*Order #:*\n{order_number}"}
             ],
         },
         {
             "type": "section",
             "text": {"type": "mrkdwn", "text": f"*Reason:*\n{reason}"},
-        },
-        {"type": "divider"},
-        {
-            "type": "actions",
-            "block_id": "refund_actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "✅ Issue Refund", "emoji": True},
-                    "style": "primary",
-                    "action_id": "issue_refund",
-                    "value": json.dumps({
-                        "order_number": order_number,
-                        "contact_name": contact_name,
-                        "phone": phone,
-                        "pos_provider": pos_provider,
-                    }),
-                    "confirm": {
-                        "title": {"type": "plain_text", "text": "Issue refund?"},
-                        "text": {"type": "plain_text", "text": f"This will refund order {order_number} via {pos_provider}."},
-                        "confirm": {"type": "plain_text", "text": "Yes, refund"},
-                        "deny": {"type": "plain_text", "text": "Cancel"},
-                    },
-                },
-            ],
         },
     ]
 
@@ -104,7 +77,6 @@ def _general_blocks(contact_name: str, phone: str, issue: str, order_number: str
                     "text": {"type": "plain_text", "text": "✔ Mark Completed", "emoji": True},
                     "style": "primary",
                     "action_id": "mark_completed",
-                    # ↓ all the details baked into the button right here
                     "value": json.dumps({
                         "contact_name": contact_name,
                         "phone": phone,
@@ -138,7 +110,6 @@ def register(mcp: FastMCP):
 
         Always collect contact_name and phone first.
         For order-related issues, also collect order_number.
-        For refunds, also collect pos_provider (e.g. 'square' or 'clover').
 
         Args:
             contact_name:    Customer's full name
@@ -146,7 +117,6 @@ def register(mcp: FastMCP):
             issue:           Brief description of the issue or question
             escalation_type: 'refund' or 'general' (default: 'general')
             order_number:    Order ID if applicable (required for refunds)
-            pos_provider:    POS system: 'square' or 'clover' (required for refunds)
         """
         if not os.getenv("SLACK_BOT_TOKEN"):
             return {"success": False, "error": "SLACK_BOT_TOKEN is not configured."}
@@ -154,7 +124,7 @@ def register(mcp: FastMCP):
         if escalation_type == "refund":
             if not order_number:
                 return {"success": False, "error": "order_number is required for refund escalations."}
-            blocks = _refund_blocks(contact_name, phone, order_number, issue, pos_provider)
+            blocks = _refund_blocks(contact_name, phone, order_number, issue)
             fallback_text = f"Refund request from {contact_name} ({phone}) — Order #{order_number}"
         else:
             blocks = _general_blocks(contact_name, phone, issue, order_number or None)

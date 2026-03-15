@@ -44,8 +44,8 @@ def _resolve_items(line_items: list[dict]) -> tuple[list, list, float]:
         line_total = round(item["price"] * quantity, 2)
         subtotal  += line_total
         resolved.append({
-            "item_id":      item_id,                           # Square item ID (lookup key)
-            "variation_id": item.get("variation_id", item_id), # Square variation ID (sent to Orders API)
+            "item_id":      item_id,
+            "variation_id": item.get("variation_id", item_id),
             "name":         item["name"],
             "unit_price":   item["price"],
             "quantity":     quantity,
@@ -137,6 +137,7 @@ def register(mcp: FastMCP):
             "success":       True,
             "order_id":      idempotency_key,
             "pos_order_id":  pos_result["pos_order_id"],
+            "order_code":    pos_result["order_code"],          # ← added
             "pos_status":    pos_result["status"],
             "restaurant":    "Bella Tavola",
             "customer_name": customer_name,

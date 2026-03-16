@@ -1,8 +1,8 @@
-# Nova Dine - AI Voice Receptionist
+# SonicServe - AI Voice Agent for Restaurants
 
-> Built for the **AWS Hackathon** · Powered by Amazon Nova Sonic + Twilio
+> Built for the **AWS Hackathon** · Powered by Amazon Nova 2 Sonic
 
-Nova Dine is a fully AI-powered phone receptionist for a restaurant. Callers speak naturally to make reservations, place takeout orders, and ask about the menu - no hold music, no phone trees. A parallel **Slack agent** lets staff manage store operations (hours, inventory, and policies) without leaving their chat workspace.
+SonicServe is a fully autonomous AI voice agent for restaurants. Callers speak naturally to place orders, make reservations, browse the menu, and request call transfers or manager escalations - no hold music, no phone trees. A parallel **Slack agent** lets staff manage store operations (hours, inventory, and policies) without leaving their chat workspace.
 
 ---
 
@@ -14,7 +14,7 @@ The system is split into two independent paths:
 
 **Voice path:** Twilio receives an inbound call and opens a WebSocket media stream to the FastAPI server. Audio is relayed to Amazon Nova Sonic (Bedrock) which handles bidirectional streaming with barge-in detection. Nova Sonic calls tools via an MCP server (FastMCP) to handle reservations, orders, menu lookups, escalations, and call transfers.
 
-**Slack path:** A Strands agent powered by Amazon Nova Pro listens for staff mentions and DMs in Slack. It calls its own set of tools directly (no MCP) to update business hours, manage Square inventory, and edit policies stored in PostgreSQL.
+**Slack path:** A Strands agent powered by Amazon Nova Pro listens for staff mentions and DMs in Slack. It calls its own set of tools directly (no MCP) to update business hours, manage Square inventory, and edit policies stored in PostgreSQL. The agent runs in Socket Mode, so Slack pushes events directly over a persistent WebSocket connection - no public endpoint required.
 
 ---
 
@@ -109,7 +109,7 @@ The system is split into two independent paths:
 - Twilio account with a phone number
 - Square developer account (sandbox or production)
 - PostgreSQL database (local or RDS)
-- Slack app with bot token and signing secret
+- Slack app with bot token, signing secret, and app-level token (for Socket Mode)
 - ngrok (local development only)
 
 ---
@@ -135,6 +135,7 @@ CLOVER_MERCHANT_ID=
 
 # Slack
 SLACK_BOT_TOKEN=                    # xoxb- bot token
+SLACK_APP_TOKEN=                    # xapp- app-level token, required for Socket Mode
 SLACK_SIGNING_SECRET=               # used to verify incoming Slack requests
 SLACK_ESCALATION_CHANNEL=#manager-alerts
 SLACK_RESERVATION_CHANNEL=#reservations
@@ -234,6 +235,32 @@ sequenceDiagram
 
 ---
 
+## Slack Agent Flow
+
+```mermaid
+sequenceDiagram
+    participant Staff
+    participant Slack
+    participant SlackBolt
+    participant Strands
+    participant NovaPro
+    participant DB/Square
+
+    Staff->>Slack: @bot we're closed this Sunday
+    Slack->>SlackBolt: Event pushed over Socket Mode WebSocket
+    SlackBolt->>Strands: Forward message + conversation context
+    Strands->>NovaPro: Invoke Nova Pro with tool definitions
+    NovaPro-->>Strands: Tool call (e.g. update_business_hours)
+    Strands->>DB/Square: Execute tool against PostgreSQL / Square API
+    DB/Square-->>Strands: Result
+    Strands->>NovaPro: Return tool result, request final response
+    NovaPro-->>Strands: Natural language confirmation
+    Strands-->>SlackBolt: Response text
+    SlackBolt-->>Staff: "Got it! Marked Sunday as closed."
+```
+
+---
+
 ## Production Deployment (AWS ECS)
 
 The voice server is containerized and deployed to ECS via ECR. The Twilio webhook is pointed at the ECS service URL instead of ngrok.
@@ -314,7 +341,11 @@ Invite the bot to any channel or DM it directly. Example commands:
 
 **MCP for the voice path:** Tools are registered as MCP-compliant specs so Nova Sonic can invoke them natively via Bedrock's tool-use protocol. This keeps `nova_sonic.py` decoupled from any specific business logic.
 
-**Strands for the Slack path:** The Slack agent is a standalone Strands agent with its own tools. It does not share the MCP server; its tools call PostgreSQL and Square directly, which keeps latency low for synchronous Slack interactions.
+**Bidirectional streaming with Nova Sonic:** Nova Sonic runs as a persistent Bedrock session over a bidirectional WebSocket - audio flows in from the caller while synthesized speech flows back simultaneously. The server manages two async loops: one forwarding u-law audio (resampled to PCM 16kHz) to Bedrock, and another consuming PCM 24kHz responses and resampling back to u-law for Twilio. A generation ID gates outbound audio so stale chunks from interrupted responses are silently dropped rather than played.
+
+**Strands agent + Slack Bolt:** The Slack agent combines Slack Bolt (for event handling) with a Strands agent (for reasoning and tool orchestration). Bolt receives the incoming message, extracts the text and channel context, and hands it to the Strands agent. The agent is initialized with Amazon Nova Pro as its model and a set of registered tool functions. Strands handles the multi-step reasoning loop - deciding which tools to call, invoking them, and synthesizing a natural language reply - which Bolt then posts back to the channel.
+
+**Socket Mode for the Slack agent:** Rather than exposing a public HTTP endpoint for Slack events, the agent uses Socket Mode - Slack pushes events directly over a persistent WebSocket connection. This means no ingress rules, no ngrok tunnel, and no load balancer needed for the Slack path. The agent runs anywhere (local, ECS, a developer's laptop) and receives events instantly without any webhook infrastructure.
 
 **Barge-in handling:** When Nova Sonic detects the caller speaking mid-response, the server clears Twilio's audio playback buffer, increments a generation ID to drop stale audio chunks, and reopens the audio channel without dropping the WebSocket connection.
 
